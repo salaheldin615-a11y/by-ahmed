@@ -1,0 +1,673 @@
+-- سكربت by ahmed - جميع النوافذ قابلة للسحب
+-- يمكنك تحريك: اللوحة الرئيسية، نافذة الإعدادات، نافذة اختيار اللاعبين
+
+local Players = game:GetService("Players")
+local plr = Players.LocalPlayer
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local HttpService = game:GetService("HttpService")
+local CoreGui = game:GetService("CoreGui")
+
+-- ==================== ألوان جديدة ====================
+local Colors = {
+    Primary = Color3.fromRGB(18, 12, 28),
+    Secondary = Color3.fromRGB(28, 20, 38),
+    Card = Color3.fromRGB(35, 28, 48),
+    NeonBlue = Color3.fromRGB(0, 200, 255),
+    NeonPink = Color3.fromRGB(255, 50, 150),
+    NeonPurple = Color3.fromRGB(150, 70, 255),
+    NeonGold = Color3.fromRGB(255, 180, 50),
+    Success = Color3.fromRGB(0, 220, 120),
+    Danger = Color3.fromRGB(255, 60, 80),
+    Warning = Color3.fromRGB(255, 140, 40),
+    Text = Color3.fromRGB(245, 240, 255),
+    TextDim = Color3.fromRGB(180, 170, 210),
+}
+
+-- ==================== دالة جعل أي نافذة قابلة للسحب ====================
+local function MakeDraggable(frame, dragBar)
+    local dragging = false
+    local dragStart, startPos
+    
+    dragBar.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = frame.Position
+        end
+    end)
+    
+    dragBar.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = false
+        end
+    end)
+    
+    UserInputService.InputChanged:Connect(function(input)
+        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            local delta = input.Position - dragStart
+            frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end)
+end
+
+-- ==================== تأثيرات ====================
+local function CreateBorderGlow(frame, speed)
+    local stroke = Instance.new("UIStroke", frame)
+    stroke.Thickness = 2
+    local hue = 0
+    task.spawn(function()
+        while frame and frame.Parent do
+            hue = (hue + (speed or 0.005)) % 1
+            stroke.Color = Color3.fromHSV(hue, 1, 0.9)
+            task.wait(0.05)
+        end
+    end)
+    return stroke
+end
+
+local function ButtonEffect(btn)
+    local origSize = btn.Size
+    TweenService:Create(btn, TweenInfo.new(0.05), {Size = UDim2.new(origSize.X.Scale * 0.97, origSize.X.Offset, origSize.Y.Scale * 0.97, origSize.Y.Offset)}):Play()
+    task.wait(0.05)
+    TweenService:Create(btn, TweenInfo.new(0.05), {Size = origSize}):Play()
+end
+
+-- ==================== نظام الـ BLACKLIST ====================
+local BLACKLIST = {  
+    "Waleedking70", "JJFH23456771", "omarbkp", 
+    "fastma_storage", "No_Louay", "mlk123456771", "fling_2009", "", "CmdBarDestroyer"
+}  
+
+local function IsPlayerBlacklisted(playerName)  
+    local nameLower = playerName:lower()  
+    for _, blacklistedName in ipairs(BLACKLIST) do  
+        if nameLower == blacklistedName:lower() then return true end  
+    end  
+    return false 
+end  
+
+if IsPlayerBlacklisted(plr.Name) then  
+    local warningGui = Instance.new("ScreenGui", plr.PlayerGui) 
+    local warningFrame = Instance.new("Frame", warningGui)  
+    warningFrame.Size = UDim2.new(0, 400, 0, 200)  
+    warningFrame.Position = UDim2.new(0.5, -200, 0.5, -100)  
+    warningFrame.BackgroundColor3 = Color3.fromRGB(20, 0, 0)  
+    Instance.new("UICorner", warningFrame).CornerRadius = UDim.new(0, 15)
+    local title = Instance.new("TextLabel", warningFrame)  
+    title.Size = UDim2.new(1, 0, 0, 50)  
+    title.Text = "⚠️ BLACKLIST DETECTED ⚠️"  
+    title.TextColor3 = Color3.new(1, 1, 1)  
+    title.Font = Enum.Font.GothamBlack 
+    title.TextScaled = true  
+    task.wait(3)  
+    plr:Kick("🚫 دز")
+    return 
+end
+
+-- ==================== إعدادات السكربت ====================
+local currentPrefix = ";" 
+local attackCommands = { "clogs [target]", "re [target]" } 
+
+local function SaveCommands()
+    pcall(function() writefile("Ahmed_Hub.json", HttpService:JSONEncode(attackCommands)) end)
+end
+
+local function LoadCommands()
+    pcall(function()
+        if isfile and isfile("Ahmed_Hub.json") then
+            attackCommands = HttpService:JSONDecode(readfile("Ahmed_Hub.json"))
+        end
+    end)
+end
+LoadCommands()
+
+-- ==================== إنشاء الواجهة ====================
+if CoreGui:FindFirstChild("Ahmed_Hub") then 
+    CoreGui.Ahmed_Hub:Destroy() 
+end
+
+local ScreenGui = Instance.new("ScreenGui", CoreGui)
+ScreenGui.Name = "Ahmed_Hub"
+ScreenGui.ResetOnSpawn = false
+
+-- ==================== الزر الجانبي (قابل للسحب) ====================
+local SideBtn = Instance.new("TextButton", ScreenGui)
+SideBtn.Size = UDim2.new(0, 50, 0, 50)
+SideBtn.Position = UDim2.new(0.02, 0, 0.9, 0)
+SideBtn.BackgroundColor3 = Colors.NeonPurple
+SideBtn.Text = "🔥"
+SideBtn.TextColor3 = Colors.Text
+SideBtn.TextSize = 24
+SideBtn.Visible = true
+Instance.new("UICorner", SideBtn).CornerRadius = UDim.new(1, 0)
+CreateBorderGlow(SideBtn, 0.01)
+
+-- جعل الزر الجانبي قابل للسحب
+MakeDraggable(SideBtn, SideBtn)
+
+-- ==================== اللوحة الرئيسية (قابلة للسحب) ====================
+local MainFrame = Instance.new("Frame", ScreenGui)
+MainFrame.Size = UDim2.new(0, 500, 0, 380)
+MainFrame.Position = UDim2.new(0.5, -250, 0.5, -190)
+MainFrame.BackgroundColor3 = Colors.Primary
+MainFrame.BackgroundTransparency = 0.05
+MainFrame.Visible = false
+Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 20)
+Instance.new("UIStroke", MainFrame).Color = Colors.NeonBlue
+
+-- ==================== رأس اللوحة (شريط للسحب) ====================
+local Header = Instance.new("Frame", MainFrame)
+Header.Size = UDim2.new(1, 0, 0, 55)
+Header.BackgroundColor3 = Colors.Secondary
+Instance.new("UICorner", Header).CornerRadius = UDim.new(0, 20)
+
+-- جعل اللوحة الرئيسية قابلة للسحب عن طريق سحب الرأس
+MakeDraggable(MainFrame, Header)
+
+local Title = Instance.new("TextLabel", Header)
+Title.Size = UDim2.new(0, 150, 1, 0)
+Title.Position = UDim2.new(0, 15, 0, 0)
+Title.BackgroundTransparency = 1
+Title.Text = "AHMED HUB"
+Title.TextColor3 = Colors.NeonGold
+Title.TextSize = 18
+Title.Font = Enum.Font.GothamBold
+Title.TextXAlignment = Enum.TextXAlignment.Left
+
+-- عداد اللاعبين
+local PlayerCount = Instance.new("TextLabel", Header)
+PlayerCount.Size = UDim2.new(0, 120, 1, 0)
+PlayerCount.Position = UDim2.new(0.5, -60, 0, 0)
+PlayerCount.BackgroundTransparency = 1
+PlayerCount.Text = "👥 0/0"
+PlayerCount.TextColor3 = Colors.NeonBlue
+PlayerCount.TextSize = 13
+PlayerCount.Font = Enum.Font.Gotham
+
+-- أزرار التحكم
+local CloseBtn = Instance.new("TextButton", Header)
+CloseBtn.Size = UDim2.new(0, 32, 0, 32)
+CloseBtn.Position = UDim2.new(1, -45, 0.5, -16)
+CloseBtn.BackgroundColor3 = Colors.Danger
+CloseBtn.Text = "✕"
+CloseBtn.TextColor3 = Colors.Text
+Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(1, 0)
+
+local SettingsBtn = Instance.new("TextButton", Header)
+SettingsBtn.Size = UDim2.new(0, 32, 0, 32)
+SettingsBtn.Position = UDim2.new(1, -85, 0.5, -16)
+SettingsBtn.BackgroundColor3 = Colors.NeonBlue
+SettingsBtn.Text = "⚙"
+SettingsBtn.TextColor3 = Colors.Text
+Instance.new("UICorner", SettingsBtn).CornerRadius = UDim.new(1, 0)
+
+-- ==================== المحتوى (قسمين) ====================
+-- القسم الأيسر
+local LeftPanel = Instance.new("Frame", MainFrame)
+LeftPanel.Size = UDim2.new(0.48, 0, 1, -65)
+LeftPanel.Position = UDim2.new(0, 10, 0, 70)
+LeftPanel.BackgroundColor3 = Colors.Card
+LeftPanel.BackgroundTransparency = 0.3
+Instance.new("UICorner", LeftPanel).CornerRadius = UDim.new(0, 12)
+
+local LeftTitle = Instance.new("TextLabel", LeftPanel)
+LeftTitle.Size = UDim2.new(1, 0, 0, 35)
+LeftTitle.Position = UDim2.new(0, 10, 0, 5)
+LeftTitle.BackgroundTransparency = 1
+LeftTitle.Text = "⌨️ COMMAND EXECUTOR"
+LeftTitle.TextColor3 = Colors.NeonBlue
+LeftTitle.TextSize = 12
+LeftTitle.Font = Enum.Font.GothamBold
+LeftTitle.TextXAlignment = Enum.TextXAlignment.Left
+
+local CommandInput = Instance.new("TextBox", LeftPanel)
+CommandInput.Size = UDim2.new(1, -20, 0, 45)
+CommandInput.Position = UDim2.new(0, 10, 0, 45)
+CommandInput.BackgroundColor3 = Colors.Secondary
+CommandInput.Text = ""
+CommandInput.PlaceholderText = "اكتب الأمر هنا..."
+CommandInput.TextColor3 = Colors.Text
+CommandInput.Font = Enum.Font.Gotham
+CommandInput.TextSize = 13
+Instance.new("UICorner", CommandInput).CornerRadius = UDim.new(0, 10)
+
+local LoopLabel = Instance.new("TextLabel", LeftPanel)
+LoopLabel.Size = UDim2.new(1, -20, 0, 20)
+LoopLabel.Position = UDim2.new(0, 10, 0, 100)
+LoopLabel.BackgroundTransparency = 1
+LoopLabel.Text = "عدد التكرار:"
+LoopLabel.TextColor3 = Colors.TextDim
+LoopLabel.TextSize = 11
+
+local LoopCount = Instance.new("TextBox", LeftPanel)
+LoopCount.Size = UDim2.new(1, -20, 0, 40)
+LoopCount.Position = UDim2.new(0, 10, 0, 120)
+LoopCount.BackgroundColor3 = Colors.Secondary
+LoopCount.Text = "1"
+LoopCount.PlaceholderText = "1"
+LoopCount.TextColor3 = Colors.Text
+LoopCount.Font = Enum.Font.Gotham
+LoopCount.TextSize = 13
+Instance.new("UICorner", LoopCount).CornerRadius = UDim.new(0, 10)
+
+local SendBtn = Instance.new("TextButton", LeftPanel)
+SendBtn.Size = UDim2.new(1, -20, 0, 45)
+SendBtn.Position = UDim2.new(0, 10, 0, 175)
+SendBtn.BackgroundColor3 = Colors.NeonBlue
+SendBtn.Text = "إرسال الأمر"
+SendBtn.TextColor3 = Colors.Primary
+SendBtn.TextSize = 14
+SendBtn.Font = Enum.Font.GothamBold
+Instance.new("UICorner", SendBtn).CornerRadius = UDim.new(0, 10)
+
+-- القسم الأيمن
+local RightPanel = Instance.new("Frame", MainFrame)
+RightPanel.Size = UDim2.new(0.48, 0, 1, -65)
+RightPanel.Position = UDim2.new(0.52, 0, 0, 70)
+RightPanel.BackgroundColor3 = Colors.Card
+RightPanel.BackgroundTransparency = 0.3
+Instance.new("UICorner", RightPanel).CornerRadius = UDim.new(0, 12)
+
+local RightTitle = Instance.new("TextLabel", RightPanel)
+RightTitle.Size = UDim2.new(1, 0, 0, 35)
+RightTitle.Position = UDim2.new(0, 10, 0, 5)
+RightTitle.BackgroundTransparency = 1
+RightTitle.Text = "🎯 TARGET & ATTACK"
+RightTitle.TextColor3 = Colors.NeonPink
+RightTitle.TextSize = 12
+RightTitle.Font = Enum.Font.GothamBold
+RightTitle.TextXAlignment = Enum.TextXAlignment.Left
+
+local TargetInput = Instance.new("TextBox", RightPanel)
+TargetInput.Size = UDim2.new(1, -20, 0, 45)
+TargetInput.Position = UDim2.new(0, 10, 0, 45)
+TargetInput.BackgroundColor3 = Colors.Secondary
+TargetInput.Text = ""
+TargetInput.PlaceholderText = "اسم الهدف..."
+TargetInput.TextColor3 = Colors.Text
+TargetInput.Font = Enum.Font.Gotham
+TargetInput.TextSize = 13
+Instance.new("UICorner", TargetInput).CornerRadius = UDim.new(0, 10)
+
+local PlayerListBtn = Instance.new("TextButton", RightPanel)
+PlayerListBtn.Size = UDim2.new(1, -20, 0, 40)
+PlayerListBtn.Position = UDim2.new(0, 10, 0, 100)
+PlayerListBtn.BackgroundColor3 = Colors.Secondary
+PlayerListBtn.Text = "📋 اختيار لاعب من القائمة"
+PlayerListBtn.TextColor3 = Colors.TextDim
+PlayerListBtn.TextSize = 12
+Instance.new("UICorner", PlayerListBtn).CornerRadius = UDim.new(0, 10)
+
+local AttackBtn = Instance.new("TextButton", RightPanel)
+AttackBtn.Size = UDim2.new(1, -20, 0, 55)
+AttackBtn.Position = UDim2.new(0, 10, 0, 155)
+AttackBtn.BackgroundColor3 = Colors.Danger
+AttackBtn.Text = "🚀 بدء الهجوم"
+AttackBtn.TextColor3 = Colors.Text
+AttackBtn.TextSize = 16
+AttackBtn.Font = Enum.Font.GothamBold
+Instance.new("UICorner", AttackBtn).CornerRadius = UDim.new(0, 10)
+
+-- ==================== نافذة اختيار اللاعبين (قابلة للسحب) ====================
+local PlayerListFrame = Instance.new("Frame", ScreenGui)
+PlayerListFrame.Size = UDim2.new(0, 280, 0, 350)
+PlayerListFrame.Position = UDim2.new(0.5, -140, 0.5, -175)
+PlayerListFrame.BackgroundColor3 = Colors.Primary
+PlayerListFrame.BackgroundTransparency = 0.05
+PlayerListFrame.Visible = false
+Instance.new("UICorner", PlayerListFrame).CornerRadius = UDim.new(0, 20)
+Instance.new("UIStroke", PlayerListFrame).Color = Colors.NeonPink
+
+local ListHeader = Instance.new("Frame", PlayerListFrame)
+ListHeader.Size = UDim2.new(1, 0, 0, 45)
+ListHeader.BackgroundColor3 = Colors.Secondary
+Instance.new("UICorner", ListHeader).CornerRadius = UDim.new(0, 20)
+
+-- جعل نافذة اختيار اللاعبين قابلة للسحب
+MakeDraggable(PlayerListFrame, ListHeader)
+
+local ListTitle = Instance.new("TextLabel", ListHeader)
+ListTitle.Size = UDim2.new(1, -50, 1, 0)
+ListTitle.Position = UDim2.new(0, 15, 0, 0)
+ListTitle.BackgroundTransparency = 1
+ListTitle.Text = "👥 اختر لاعب"
+ListTitle.TextColor3 = Colors.NeonPink
+ListTitle.TextSize = 14
+
+local ListClose = Instance.new("TextButton", ListHeader)
+ListClose.Size = UDim2.new(0, 30, 0, 30)
+ListClose.Position = UDim2.new(1, -40, 0.5, -15)
+ListClose.BackgroundColor3 = Colors.Danger
+ListClose.Text = "✕"
+ListClose.TextColor3 = Colors.Text
+Instance.new("UICorner", ListClose).CornerRadius = UDim.new(1, 0)
+ListClose.MouseButton1Click:Connect(function() PlayerListFrame.Visible = false end)
+
+local PlayerScroll = Instance.new("ScrollingFrame", PlayerListFrame)
+PlayerScroll.Size = UDim2.new(1, -20, 1, -60)
+PlayerScroll.Position = UDim2.new(0, 10, 0, 55)
+PlayerScroll.BackgroundTransparency = 1
+PlayerScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+
+local PlayerLayout = Instance.new("UIListLayout", PlayerScroll)
+PlayerLayout.Padding = UDim.new(0, 5)
+
+local function UpdatePlayerList()
+    for _, v in ipairs(PlayerScroll:GetChildren()) do if v:IsA("TextButton") then v:Destroy() end end
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= plr then
+            local btn = Instance.new("TextButton", PlayerScroll)
+            btn.Size = UDim2.new(1, 0, 0, 40)
+            btn.BackgroundColor3 = Colors.Secondary
+            btn.Text = player.Name
+            btn.TextColor3 = Colors.Text
+            Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
+            btn.MouseButton1Click:Connect(function()
+                TargetInput.Text = player.Name
+                PlayerListFrame.Visible = false
+            end)
+        end
+    end
+    PlayerLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        PlayerScroll.CanvasSize = UDim2.new(0, 0, 0, PlayerLayout.AbsoluteContentSize.Y + 10)
+    end)
+end
+
+PlayerListBtn.MouseButton1Click:Connect(function()
+    UpdatePlayerList()
+    PlayerListFrame.Visible = true
+end)
+
+-- ==================== نافذة الإعدادات (قابلة للسحب) ====================
+local SettingsFrame = Instance.new("Frame", ScreenGui)
+SettingsFrame.Size = UDim2.new(0, 380, 0, 470)
+SettingsFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
+SettingsFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+SettingsFrame.BackgroundColor3 = Colors.Primary
+SettingsFrame.BackgroundTransparency = 0.05
+SettingsFrame.Visible = false
+Instance.new("UICorner", SettingsFrame).CornerRadius = UDim.new(0, 20)
+Instance.new("UIStroke", SettingsFrame).Color = Colors.NeonGold
+
+local SettingsHeader = Instance.new("Frame", SettingsFrame)
+SettingsHeader.Size = UDim2.new(1, 0, 0, 50)
+SettingsHeader.BackgroundColor3 = Colors.Secondary
+Instance.new("UICorner", SettingsHeader).CornerRadius = UDim.new(0, 20)
+
+-- جعل نافذة الإعدادات قابلة للسحب
+MakeDraggable(SettingsFrame, SettingsHeader)
+
+local SettingsTitle = Instance.new("TextLabel", SettingsHeader)
+SettingsTitle.Size = UDim2.new(1, -50, 1, 0)
+SettingsTitle.Position = UDim2.new(0, 15, 0, 0)
+SettingsTitle.BackgroundTransparency = 1
+SettingsTitle.Text = "⚙ الإعدادات"
+SettingsTitle.TextColor3 = Colors.NeonGold
+SettingsTitle.TextSize = 16
+
+local SettingsClose = Instance.new("TextButton", SettingsHeader)
+SettingsClose.Size = UDim2.new(0, 30, 0, 30)
+SettingsClose.Position = UDim2.new(1, -40, 0.5, -15)
+SettingsClose.BackgroundColor3 = Colors.Danger
+SettingsClose.Text = "✕"
+SettingsClose.TextColor3 = Colors.Text
+Instance.new("UICorner", SettingsClose).CornerRadius = UDim.new(1, 0)
+
+local SettingsScroll = Instance.new("ScrollingFrame", SettingsFrame)
+SettingsScroll.Size = UDim2.new(1, -20, 1, -70)
+SettingsScroll.Position = UDim2.new(0, 10, 0, 60)
+SettingsScroll.BackgroundTransparency = 1
+SettingsScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+
+local SettingsLayout = Instance.new("UIListLayout", SettingsScroll)
+SettingsLayout.Padding = UDim.new(0, 10)
+
+-- ==================== عناصر الإعدادات ====================
+local PrefixBox = Instance.new("TextBox", SettingsScroll)
+PrefixBox.Size = UDim2.new(1, 0, 0, 45)
+PrefixBox.BackgroundColor3 = Colors.Secondary
+PrefixBox.Text = currentPrefix
+PrefixBox.PlaceholderText = "Prefix"
+PrefixBox.TextColor3 = Colors.Text
+Instance.new("UICorner", PrefixBox).CornerRadius = UDim.new(0, 10)
+PrefixBox:GetPropertyChangedSignal("Text"):Connect(function() currentPrefix = PrefixBox.Text end)
+
+local HeadlessBtn = Instance.new("TextButton", SettingsScroll)
+HeadlessBtn.Size = UDim2.new(1, 0, 0, 45)
+HeadlessBtn.BackgroundColor3 = Colors.Secondary
+HeadlessBtn.Text = "👤 HIDDEN HEAD"
+HeadlessBtn.TextColor3 = Colors.Text
+Instance.new("UICorner", HeadlessBtn).CornerRadius = UDim.new(0, 10)
+
+local SkyboxBtn = Instance.new("TextButton", SettingsScroll)
+SkyboxBtn.Size = UDim2.new(1, 0, 0, 45)
+SkyboxBtn.BackgroundColor3 = Colors.Secondary
+SkyboxBtn.Text = "🌌 SKYBOX & EMOTE"
+SkyboxBtn.TextColor3 = Colors.Text
+Instance.new("UICorner", SkyboxBtn).CornerRadius = UDim.new(0, 10)
+
+local AntiSpamBtn = Instance.new("TextButton", SettingsScroll)
+AntiSpamBtn.Size = UDim2.new(1, 0, 0, 45)
+AntiSpamBtn.BackgroundColor3 = Colors.Secondary
+AntiSpamBtn.Text = "🛡️ ANTI SPAM: OFF"
+AntiSpamBtn.TextColor3 = Colors.Text
+Instance.new("UICorner", AntiSpamBtn).CornerRadius = UDim.new(0, 10)
+
+-- Add Command
+local AddTitle = Instance.new("TextLabel", SettingsScroll)
+AddTitle.Size = UDim2.new(1, 0, 0, 25)
+AddTitle.BackgroundTransparency = 1
+AddTitle.Text = "➕ إضافة أمر جديد"
+AddTitle.TextColor3 = Colors.NeonBlue
+AddTitle.TextSize = 12
+
+local AddInput = Instance.new("TextBox", SettingsScroll)
+AddInput.Size = UDim2.new(1, 0, 0, 45)
+AddInput.BackgroundColor3 = Colors.Secondary
+AddInput.Text = ""
+AddInput.PlaceholderText = "أمر جديد... (مثال: kill [target])"
+AddInput.TextColor3 = Colors.Text
+Instance.new("UICorner", AddInput).CornerRadius = UDim.new(0, 10)
+
+local AddBtn = Instance.new("TextButton", SettingsScroll)
+AddBtn.Size = UDim2.new(1, 0, 0, 45)
+AddBtn.BackgroundColor3 = Colors.Success
+AddBtn.Text = "➕ إضافة"
+AddBtn.TextColor3 = Colors.Primary
+AddBtn.TextSize = 14
+AddBtn.Font = Enum.Font.GothamBold
+Instance.new("UICorner", AddBtn).CornerRadius = UDim.new(0, 10)
+
+-- Command List
+local ListTitle = Instance.new("TextLabel", SettingsScroll)
+ListTitle.Size = UDim2.new(1, 0, 0, 25)
+ListTitle.BackgroundTransparency = 1
+ListTitle.Text = "📋 الأوامر الحالية"
+ListTitle.TextColor3 = Colors.NeonPink
+ListTitle.TextSize = 12
+
+local CmdScroll = Instance.new("ScrollingFrame", SettingsScroll)
+CmdScroll.Size = UDim2.new(1, 0, 0, 150)
+CmdScroll.BackgroundColor3 = Colors.Secondary
+CmdScroll.BackgroundTransparency = 0.3
+CmdScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+CmdScroll.ScrollBarThickness = 4
+Instance.new("UICorner", CmdScroll).CornerRadius = UDim.new(0, 10)
+
+local CmdLayout = Instance.new("UIListLayout", CmdScroll)
+CmdLayout.Padding = UDim.new(0, 5)
+
+local function UpdateCmdList()
+    for _, v in ipairs(CmdScroll:GetChildren()) do if v:IsA("TextButton") then v:Destroy() end end
+    for i, cmd in ipairs(attackCommands) do
+        local b = Instance.new("TextButton", CmdScroll)
+        b.Size = UDim2.new(1, 0, 0, 35)
+        b.BackgroundColor3 = Colors.Secondary
+        b.Text = cmd .. " ✕"
+        b.TextColor3 = Colors.Text
+        b.TextSize = 11
+        Instance.new("UICorner", b).CornerRadius = UDim.new(0, 8)
+        b.MouseButton1Click:Connect(function()
+            table.remove(attackCommands, i)
+            SaveCommands()
+            UpdateCmdList()
+        end)
+    end
+    CmdLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        CmdScroll.CanvasSize = UDim2.new(0, 0, 0, CmdLayout.AbsoluteContentSize.Y + 10)
+    end)
+end
+UpdateCmdList()
+
+AddBtn.MouseButton1Click:Connect(function()
+    if AddInput.Text ~= "" then
+        local cmdText = AddInput.Text
+        if not cmdText:find("%[target%]") then cmdText = cmdText .. " [target]" end
+        table.insert(attackCommands, cmdText)
+        SaveCommands()
+        AddInput.Text = ""
+        UpdateCmdList()
+    end
+end)
+
+-- ==================== دوال السكربت ====================
+local remote = ReplicatedStorage:WaitForChild("HDAdminHDClient"):WaitForChild("Signals"):WaitForChild("RequestCommandSilent")
+local attackLoop = false
+local isHeadless, isSkybox = false, false
+local antiSpamActive = false
+
+local deleteTargets = {
+    PlayerGui = {"CommandMenucommandLogs", "CommandMenuchatLogs", "Notices", "CustomTopBar", "CmdBar"},
+    Workspace = {"HDAdminNightVision"},
+    Characters = {"HDAdminNightVision"}
+}
+
+local function toggleLOR_Assets(state)
+    pcall(function()
+        local assets = ReplicatedStorage:WaitForChild("HDAdminHDClient"):WaitForChild("Signals").Parent:WaitForChild("Assets")
+        local nv = assets:FindFirstChild(state == "start" and "NightVision" or "1NightVision")
+        if nv then nv.Name = (state == "start" and "1NightVision" or "NightVision") end
+        local templates = plr.PlayerGui:WaitForChild("HDAdminInterface"):WaitForChild("MenuTemplates")
+        local temp = templates:FindFirstChild(state == "start" and "Template5" or "Template")
+        if temp then temp.Name = (state == "start" and "Template" or "Template5") end
+    end)
+end
+
+RunService.Heartbeat:Connect(function()
+    if antiSpamActive then
+        pcall(function()
+            for _, name in ipairs(deleteTargets.PlayerGui) do
+                local t = plr.PlayerGui:FindFirstChild(name, true)
+                if t then t:Destroy() end
+            end
+        end)
+    end
+end)
+
+-- ==================== الأحداث ====================
+SendBtn.MouseButton1Click:Connect(function()
+    ButtonEffect(SendBtn)
+    local count = math.clamp(tonumber(LoopCount.Text) or 1, 1, 100000)
+    if CommandInput.Text ~= "" then
+        for i = 1, count do
+            task.spawn(function() remote:InvokeServer(CommandInput.Text) end)
+        end
+    end
+end)
+
+AttackBtn.MouseButton1Click:Connect(function()
+    ButtonEffect(AttackBtn)
+    attackLoop = not attackLoop
+    AttackBtn.Text = attackLoop and "⏹️ إيقاف الهجوم" or "🚀 بدء الهجوم"
+    AttackBtn.BackgroundColor3 = attackLoop and Colors.Warning or Colors.Danger
+    if attackLoop then
+        task.spawn(function()
+            while attackLoop do
+                local target = TargetInput.Text
+                if target ~= "" then
+                    for _, cmd in ipairs(attackCommands) do
+                        task.spawn(function() remote:InvokeServer(currentPrefix .. cmd:gsub("%[target%]", target)) end)
+                    end
+                end
+                task.wait(0.2)
+            end
+        end)
+    end
+end)
+
+HeadlessBtn.MouseButton1Click:Connect(function()
+    ButtonEffect(HeadlessBtn)
+    isHeadless = not isHeadless
+    if isHeadless then
+        remote:InvokeServer(currentPrefix .. "head me 134082579")
+        HeadlessBtn.Text = "👤 HIDDEN HEAD: ON"
+        HeadlessBtn.BackgroundColor3 = Colors.Success
+    else
+        remote:InvokeServer(currentPrefix .. "re me")
+        HeadlessBtn.Text = "👤 HIDDEN HEAD"
+        HeadlessBtn.BackgroundColor3 = Colors.Secondary
+    end
+end)
+
+SkyboxBtn.MouseButton1Click:Connect(function()
+    ButtonEffect(SkyboxBtn)
+    isSkybox = not isSkybox
+    if isSkybox then
+        remote:InvokeServer(currentPrefix .. "skybox 15117424103")
+        remote:InvokeServer(currentPrefix .. "bundle me 148351107651039")
+        remote:InvokeServer(currentPrefix .. "emote me 93224413172183")
+        SkyboxBtn.Text = "🌌 SKYBOX & EMOTE: ON"
+        SkyboxBtn.BackgroundColor3 = Colors.NeonPurple
+    else
+        remote:InvokeServer(currentPrefix .. "re me")
+        remote:InvokeServer(currentPrefix .. "unskybox")
+        SkyboxBtn.Text = "🌌 SKYBOX & EMOTE"
+        SkyboxBtn.BackgroundColor3 = Colors.Secondary
+    end
+end)
+
+AntiSpamBtn.MouseButton1Click:Connect(function()
+    ButtonEffect(AntiSpamBtn)
+    antiSpamActive = not antiSpamActive
+    AntiSpamBtn.Text = antiSpamActive and "🛡️ ANTI SPAM: ON ✅" or "🛡️ ANTI SPAM: OFF ❌"
+    AntiSpamBtn.BackgroundColor3 = antiSpamActive and Colors.Success or Colors.Secondary
+    if antiSpamActive then toggleLOR_Assets("start") else toggleLOR_Assets("stop") end
+end)
+
+CloseBtn.MouseButton1Click:Connect(function()
+    MainFrame.Visible = false
+    SideBtn.Visible = true
+end)
+
+SideBtn.MouseButton1Click:Connect(function()
+    MainFrame.Visible = true
+    SideBtn.Visible = false
+end)
+
+SettingsBtn.MouseButton1Click:Connect(function()
+    SettingsFrame.Visible = true
+end)
+
+SettingsClose.MouseButton1Click:Connect(function()
+    SettingsFrame.Visible = false
+end)
+
+-- تحديث Canvas
+SettingsLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    SettingsScroll.CanvasSize = UDim2.new(0, 0, 0, SettingsLayout.AbsoluteContentSize.Y + 20)
+end)
+
+-- تحديث عداد اللاعبين
+task.spawn(function()
+    while true do
+        local count = #Players:GetPlayers()
+        PlayerCount.Text = "👥 " .. count .. "/" .. game.Players.MaxPlayers
+        task.wait(1)
+    end
+end)
+
+print("✅ AHMED HUB | جميع النوافذ قابلة للسحب")
+print("🔥 اسحب: اللوحة الرئيسية، الإعدادات، قائمة اللاعبين")
